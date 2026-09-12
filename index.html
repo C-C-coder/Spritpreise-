@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Sprit-Check</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sprit-Check">
+<meta name="theme-color" content="#173650">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-top: #173650;
+    --bg-bottom: #E8ECEA;
+    --panel: #FFFFFF;
+    --ink: #16211C;
+    --ink-soft: #5B6660;
+    --line: #E1E4DF;
+    --route-blue: #1B4B66;
+    --route-blue-deep: #123549;
+    --amber: #E8A33D;
+    --diesel: #2E2E2E;
+    --super: #3C7A4E;
+    --error: #A33A2E;
+    --radius: 16px;
+    --shadow: 0 2px 10px rgba(15, 35, 45, 0.08), 0 1px 2px rgba(15, 35, 45, 0.06);
+  }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html{ -webkit-text-size-adjust: 100%; }
+  body{
+    margin:0;
+    background: var(--bg-bottom);
+    color: var(--ink);
+    font-family: 'Space Grotesk', sans-serif;
+    line-height: 1.45;
+    padding: 0 0 40px;
+    font-size: 16px;
+  }
+  header{
+    background: linear-gradient(160deg, var(--route-blue) 0%, var(--route-blue-deep) 100%);
+    color: #fff;
+    padding: max(20px, env(safe-area-inset-top)) 18px 26px;
+    border-radius: 0 0 22px 22px;
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  header img.logo{
+    width: 44px;
+    height: 44px;
+    border-radius: 11px;
+    object-fit: cover;
+    background: rgba(255,255,255,0.12);
+    flex-shrink: 0;
+  }
+  header .titles h1{
+    margin: 0 0 2px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  header .titles p{
+    margin: 0;
+    color: #B9D2DE;
+    font-size: 0.82rem;
+  }
+  main{
+    max-width: 480px;
+    margin: -14px auto 0;
+    padding: 0 12px;
+    position: relative;
+  }
+  .status-line{
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    margin: 16px 2px 14px;
+    line-height: 1.5;
+  }
+  .status-line.error{ color: var(--error); }
+
+  .hero-grid{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .hero-card{
+    background: var(--panel);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px 14px 12px;
+    min-width: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-card::before{
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+  }
+  .hero-card.diesel::before{ background: var(--diesel); }
+  .hero-card.super::before{ background: var(--super); }
+  .hero-label{
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+    display:flex;
+    align-items:center;
+    gap: 5px;
+  }
+  .hero-price{
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 1.45rem;
+    line-height: 1.1;
+  }
+  .hero-price .cur{ font-size: 0.85rem; font-weight: 500; color: var(--ink-soft); margin-left: 2px; }
+  .hero-station{
+    font-size: 0.78rem;
+    margin-top: 5px;
+    color: var(--ink);
+    overflow-wrap: break-word;
+  }
+  .hero-avg{
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--line);
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    display:flex;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .hero-avg strong{ font-family:'JetBrains Mono', monospace; color: var(--ink); white-space: nowrap; }
+
+  .sort-row{
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 0.8rem;
+    color: var(--ink-soft);
+    flex-wrap: wrap;
+  }
+  .sort-btn{
+    background: var(--panel);
+    border: none;
+    color: var(--ink-soft);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 0.8rem;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+  }
+  .sort-btn.active{
+    color: #fff;
+    background: var(--route-blue);
+  }
+
+  .station-card{
+    background: var(--panel);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px 15px 13px;
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .station-card::before{
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    width: 4px;
+  }
+  .station-card.best-diesel::before{ background: var(--diesel); }
+  .station-card.best-super::before{ background: linear-gradient(var(--diesel) 50%, var(--super) 50%); }
+  .station-card.best-super:not(.best-diesel)::before{ background: var(--super); }
+
+  .station-head{
+    display:flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .station-name{ font-weight: 600; font-size: 0.98rem; }
+  .station-addr{ font-size: 0.76rem; color: var(--ink-soft); margin-top: 2px; }
+  .badge-col{ display:flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+  .badge{
+    font-size: 0.64rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .badge.diesel{ background: #F2E9D6; color: #6B4E12; }
+  .badge.super{ background: #E7F1E9; color: #235430; }
+
+  .price-row{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .price-cell{
+    background: #F6F7F5;
+    border-radius: 10px;
+    padding: 8px 10px;
+  }
+  .price-cell .fl{
+    font-size: 0.68rem; color: var(--ink-soft); font-weight:600; margin-bottom: 3px;
+    display:flex; align-items:center; gap: 5px;
+  }
+  .fuel-dot{ width: 8px; height: 8px; border-radius: 50%; display:inline-block; }
+  .fuel-dot.diesel{ background: var(--diesel); }
+  .fuel-dot.super{ background: var(--super); }
+  .price-cell .fv{ font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.05rem; }
+  .price-cell .fv.na{ font-family: 'Space Grotesk', sans-serif; font-weight: 500; font-size: 0.76rem; color: var(--ink-soft); }
+
+  .hours-row{
+    font-size: 0.78rem;
+    color: var(--ink);
+    padding-top: 2px;
+  }
+  .hours-row .na{ color: var(--ink-soft); }
+  details{ margin-top: 4px; }
+  summary{ cursor: pointer; font-size: 0.74rem; color: var(--route-blue); font-weight: 600; }
+  .hours-list{ list-style: none; padding: 0; margin: 5px 0 0; font-size: 0.76rem; color: var(--ink-soft); }
+  .hours-list li{ padding: 1px 0; }
+
+  .maps-btn{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: #EAF1F4;
+    color: var(--route-blue);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .maps-btn svg{ width: 14px; height: 14px; flex-shrink: 0; }
+  .maps-btn.disabled{ opacity: 0.4; pointer-events: none; }
+
+  footer{
+    max-width: 480px;
+    margin: 16px auto 0;
+    padding: 0 14px;
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <img class="logo" src="logo.png" alt="Logo" onerror="this.style.display='none'">
+  <div class="titles">
+    <h1>Sprit-Check</h1>
+    <p>Diesel &amp; Super 95 – 9 fixe Stationen</p>
+  </div>
+</header>
+
+<main>
+  <div class="status-line" id="statusLine">Preise werden geladen …</div>
+
+  <div class="hero-grid" id="heroGrid" style="display:none;"></div>
+
+  <div class="sort-row">
+    <span>Sortieren:</span>
+    <button class="sort-btn active" id="sortDiesel" data-sort="diesel">Diesel</button>
+    <button class="sort-btn" id="sortSuper" data-sort="super">Super 95</button>
+  </div>
+
+  <div id="stationList"></div>
+</main>
+
+<footer>
+  Preisdaten: E-Control Spritpreisrechner (tagesaktuell, von Tankstellen selbst gemeldet). Jede Station wird über Adresse oder Google Plus Code geortet, die Zuordnung erfolgt über die von E-Control gemeldete Entfernung zur gesuchten Position.
+</footer>
+
+<script>
+/* ---------- Open Location Code (Plus Codes) — pair-stage decode/recover ---------- */
+const OLC_ALPHABET = '23456789CFGHJMPQRVWX';
+const OLC_PAIR_RES = [20.0, 1.0, 0.05, 0.0025, 0.000125];
+const OLC_SEP = '+';
+const OLC_SEP_POS = 8;
+
+function olcClipLat(lat){ return Math.min(90, Math.max(-90, lat)); }
+function olcNormLon(lon){ while(lon < -180) lon += 360; while(lon >= 180) lon -= 360; return lon; }
+
+function olcEncode(lat, lon, length){
+  length = length || 10;
+  lat = olcClipLat(lat); lon = olcNormLon(lon);
+  if(lat === 90) lat -= 1e-12;
+  let remLat = lat + 90, remLon = lon + 180;
+  const pairs = Math.ceil(length / 2);
+  let latDigits = [], lonDigits = [];
+  for(let i = 0; i < pairs; i++){
+    const res = OLC_PAIR_RES[i];
+    const dLat = Math.floor(remLat / res + 1e-12); remLat -= dLat * res; latDigits.push(dLat);
+    const dLon = Math.floor(remLon / res + 1e-12); remLon -= dLon * res; lonDigits.push(dLon);
+  }
+  let chars = [];
+  for(let i = 0; i < pairs; i++){ chars.push(OLC_ALPHABET[latDigits[i]]); chars.push(OLC_ALPHABET[lonDigits[i]]); }
+  return chars.join('').substring(0, length);
+}
+
+function olcDecode(digits){
+  digits = digits.toUpperCase().replace(OLC_SEP, '');
+  let remLat = 0, remLon = 0;
+  const pairs = Math.floor(digits.length / 2);
+  for(let i = 0; i < pairs; i++){
+    remLat += OLC_ALPHABET.indexOf(digits[2*i]) * OLC_PAIR_RES[i];
+    remLon += OLC_ALPHABET.indexOf(digits[2*i+1]) * OLC_PAIR_RES[i];
+  }
+  const lastRes = OLC_PAIR_RES[pairs - 1];
+  const swLat = remLat - 90, swLon = remLon - 180;
+  return { centerLat: swLat + lastRes/2, centerLon: swLon + lastRes/2 };
+}
+
+function olcRecoverNearest(shortCode, refLat, refLon){
+  shortCode = shortCode.toUpperCase();
+  refLat = olcClipLat(refLat); refLon = olcNormLon(refLon);
+  const sepIdx = shortCode.indexOf(OLC_SEP);
+  const paddingLength = OLC_SEP_POS - sepIdx;
+  const missingPairs = paddingLength / 2;
+  const resolution = OLC_PAIR_RES[missingPairs - 1];
+
+  const remLat = refLat + 90, remLon = refLon + 180;
+  const roundedLat = Math.floor(remLat / resolution) * resolution - 90;
+  const roundedLon = Math.floor(remLon / resolution) * resolution - 180;
+
+  const prefix = olcEncode(roundedLat, roundedLon, paddingLength).substring(0, paddingLength);
+  const fullDigits = prefix + shortCode.replace(OLC_SEP, '');
+  const area = olcDecode(fullDigits);
+
+  let centerLat = area.centerLat, centerLon = area.centerLon;
+  const edge = resolution / 2;
+  const latDiff = centerLat - refLat;
+  if(latDiff > edge) centerLat -= resolution; else if(latDiff < -edge) centerLat += resolution;
+  const lonDiff = centerLon - refLon;
+  if(lonDiff > edge) centerLon -= resolution; else if(lonDiff < -edge) centerLon += resolution;
+
+  return { lat: centerLat, lon: centerLon };
+}
+
+/* ---------- Stationsliste ---------- */
+const STATIONS = [
+  { name: 'Hütteter GmbH', address: 'Hauptstraße 98, 2755 Öd' },
+  { name: 'BP', address: 'Autobahnzubringer 21, 2752 Wöllersdorf' },
+  { name: 'Shell', address: 'Wiener Neustädter Str 10, 2752 Wöllersdorf' },
+  { name: 'Avanti', address: 'Puchbergerstraße 44, 2700 Wiener Neustadt' },
+  { name: 'Jet', address: 'Puchbergerstraße 1, 2700 Wiener Neustadt' },
+  { name: 'Jet', address: 'Grazer Straße 83, 2604 Theresienfeld' },
+  { name: 'OMV', address: 'Wiener Straße 126, 2700 Wiener Neustadt' },
+  { name: 'Turmöl', address: 'Wiener Straße 114, 2700 Wiener Neustadt' },
+  { name: 'Diskonttankstelle (Hofer)', address: 'Parkplatz 68, 2604 Theresienfeld', plusCode: 'R6WV+HP', locality: 'Theresienfeld' }
+];
+const PLUS_CODE_OVERRIDES = {
+  'Hütteter GmbH': { plusCode: 'V2HF+J2', locality: 'Öd, Niederösterreich' },
+  'BP': { plusCode: 'V55J+W8', locality: 'Wöllersdorf' }
+};
+STATIONS.forEach(s => { if(PLUS_CODE_OVERRIDES[s.name]) Object.assign(s, PLUS_CODE_OVERRIDES[s.name]); });
+
+const FUELS = [
+  { code: 'DIE', key: 'diesel', label: 'Diesel' },
+  { code: 'SUP', key: 'super', label: 'Super 95' }
+];
+
+function fmtPrice(n){ return n.toFixed(3).replace('.', ','); }
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+const DAY_LABELS = {
+  MONDAY:'Mo', TUESDAY:'Di', WEDNESDAY:'Mi', THURSDAY:'Do', FRIDAY:'Fr', SATURDAY:'Sa', SUNDAY:'So',
+  MO:'Mo', DI:'Di', MI:'Mi', DO:'Do', FR:'Fr', SA:'Sa', SO:'So',
+  MONTAG:'Mo', DIENSTAG:'Di', MITTWOCH:'Mi', DONNERSTAG:'Do', FREITAG:'Fr', SAMSTAG:'Sa', SONNTAG:'So',
+  0:'So', 1:'Mo', 2:'Di', 3:'Mi', 4:'Do', 5:'Fr', 6:'Sa'
+};
+const JS_TODAY_KEYS = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+
+function normalizeHoursEntry(e){
+  if(!e || typeof e !== 'object') return null;
+  const dayRaw = e.dayOfWeek ?? e.day ?? e.weekday ?? e.dow;
+  const open = e.openTime ?? e.open ?? e.from ?? e.start;
+  const close = e.closeTime ?? e.close ?? e.to ?? e.end;
+  const is24 = e.open24h === true || e.allDay === true || (open === '00:00' && (close === '24:00' || close === '00:00'));
+  const dayKey = typeof dayRaw === 'string' ? dayRaw.toUpperCase() : dayRaw;
+  return { dayLabel: DAY_LABELS[dayKey] ?? dayRaw ?? '', open, close, is24 };
+}
+
+function describeHoursToday(raw){
+  if(!raw) return null;
+  if(typeof raw === 'string') return raw;
+  if(Array.isArray(raw)){
+    const todayKey = JS_TODAY_KEYS[new Date().getDay()];
+    const entries = raw.map(normalizeHoursEntry).filter(Boolean);
+    const today = entries.find(e => e.dayLabel === DAY_LABELS[todayKey]) || entries.find(e => String(e.dayLabel) === String(new Date().getDay()));
+    if(!today) return null;
+    if(today.is24) return 'durchgehend geöffnet';
+    if(today.open && today.close) return `${today.open}–${today.close}`;
+    return null;
+  }
+  return null;
+}
+
+function describeHoursFull(raw){
+  if(!raw || !Array.isArray(raw)) return null;
+  const entries = raw.map(normalizeHoursEntry).filter(Boolean);
+  if(!entries.length) return null;
+  return entries.map(e => {
+    if(e.is24) return `${e.dayLabel}: durchgehend`;
+    if(e.open && e.close) return `${e.dayLabel}: ${e.open}–${e.close}`;
+    return `${e.dayLabel}: geschlossen`;
+  });
+}
+
+/* ---------- Ortung: Adresse oder Plus Code ---------- */
+async function geocodeAddress(query){
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=at&q=' + encodeURIComponent(query + ', Österreich');
+  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  if(!res.ok) throw new Error('Geocoding fehlgeschlagen');
+  const data = await res.json();
+  if(!data.length) return null;
+  return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+}
+
+async function resolvePoint(station){
+  if(station.plusCode){
+    const ref = await geocodeAddress(station.locality);
+    if(!ref) return null;
+    return olcRecoverNearest(station.plusCode, ref.lat, ref.lon);
+  }
+  return await geocodeAddress(station.address);
+}
+
+const MATCH_RADIUS_KM = 1.0;
+
+async function findNearestStation(point, fuelCode){
+  const url = `https://api.e-control.at/sprit/1.0/search/gas-stations/by-address?latitude=${point.lat}&longitude=${point.lon}&fuelType=${fuelCode}&includeClosed=true`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error('E-Control API nicht erreichbar');
+  const data = await res.json();
+  const list = Array.isArray(data) ? data : (data.stations || []);
+  const sorted = [...list].sort((a,b) => (a.distance ?? 99) - (b.distance ?? 99));
+  const nearby = sorted.filter(s => typeof s.distance !== 'number' || s.distance <= MATCH_RADIUS_KM);
+  if(!nearby.length) return { status: 'not_found', price: null, name: null, hours: null, open: null };
+
+  const nearest = nearby[0];
+  const hasPrice = nearest.prices && nearest.prices.length && typeof nearest.prices[0].amount === 'number';
+  const hours = nearest.openingHours || nearest.location?.openingHours || nearest.businessHours || null;
+  const open = typeof nearest.open === 'boolean' ? nearest.open : null;
+
+  if(hasPrice) return { status: 'ok', price: nearest.prices[0].amount, name: nearest.name, hours, open };
+  if(nearest.open === false) return { status: 'closed', price: null, name: nearest.name, hours, open };
+  return { status: 'no_price', price: null, name: nearest.name, hours, open };
+}
+
+async function loadAll(){
+  const statusLine = document.getElementById('statusLine');
+  const results = STATIONS.map(s => ({
+    ...s, diesel: null, super: null,
+    dieselStatus: 'not_found', superStatus: 'not_found',
+    hoursRaw: null, point: null, isOpen: null
+  }));
+
+  for(let i = 0; i < STATIONS.length; i++){
+    statusLine.textContent = `Suche Station ${i+1} von ${STATIONS.length}: ${STATIONS[i].name} …`;
+    try{
+      const point = await resolvePoint(STATIONS[i]);
+      if(!point) continue;
+      results[i].point = point;
+      const die = await findNearestStation(point, 'DIE');
+      results[i].diesel = die.price;
+      results[i].dieselStatus = die.status;
+      await sleep(300);
+      const sup = await findNearestStation(point, 'SUP');
+      results[i].super = sup.price;
+      results[i].superStatus = sup.status;
+      results[i].hoursRaw = die.hours || sup.hours || null;
+      results[i].isOpen = (die.open === false || sup.open === false) ? false
+        : (die.open === true || sup.open === true) ? true : null;
+      await sleep(700);
+    }catch(e){ /* einzelne Station darf fehlschlagen */ }
+  }
+  return results;
+}
+
+/* ---------- Rendering ---------- */
+const MAPS_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C7.6 2 4 5.6 4 10c0 5.4 7 11.5 7.3 11.7.2.2.5.3.7.3s.5-.1.7-.3C13 21.5 20 15.4 20 10c0-4.4-3.6-8-8-8zm0 11c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3z"/></svg>';
+
+function mapsButton(point, name){
+  if(!point) return `<span class="maps-btn disabled">${MAPS_ICON} Auf Google Maps öffnen</span>`;
+  const url = `https://www.google.com/maps/search/?api=1&query=${point.lat.toFixed(6)},${point.lon.toFixed(6)}`;
+  return `<a class="maps-btn" href="${url}" target="_blank" rel="noopener">${MAPS_ICON} Auf Google Maps öffnen</a>`;
+}
+
+function renderHero(results){
+  const grid = document.getElementById('heroGrid');
+  grid.innerHTML = '';
+  FUELS.forEach(fuel => {
+    const withPrice = results.filter(r => r[fuel.key] !== null);
+    const card = document.createElement('div');
+    card.className = 'hero-card ' + fuel.key;
+    if(!withPrice.length){
+      card.innerHTML = `<div class="hero-label"><span class="fuel-dot ${fuel.key}"></span>${fuel.label}</div><div class="hero-station">Keine Preisdaten</div>`;
+      grid.appendChild(card);
+      return;
+    }
+    withPrice.sort((a,b) => a[fuel.key] - b[fuel.key]);
+    const cheapest = withPrice[0];
+    const avg = withPrice.reduce((s,x) => s + x[fuel.key], 0) / withPrice.length;
+    card.innerHTML = `
+      <div class="hero-label"><span class="fuel-dot ${fuel.key}"></span>${fuel.label} – günstigste</div>
+      <div class="hero-price">${fmtPrice(cheapest[fuel.key])}<span class="cur">€</span></div>
+      <div class="hero-station">${cheapest.name}</div>
+      <div class="hero-avg"><span>Ø der 9</span><strong>${fmtPrice(avg)} €</strong></div>
+    `;
+    grid.appendChild(card);
+  });
+  grid.style.display = 'grid';
+}
+
+function renderList(results, sortKey){
+  const list = document.getElementById('stationList');
+  const sorted = [...results].sort((a,b) => {
+    const av = a[sortKey], bv = b[sortKey];
+    const aBottom = (av === null) || (a.isOpen === false);
+    const bBottom = (bv === null) || (b.isOpen === false);
+    if(aBottom !== bBottom) return aBottom ? 1 : -1;
+    if(av === null && bv === null) return 0;
+    if(av === null) return 1;
+    if(bv === null) return -1;
+    return av - bv;
+  });
+
+  const cheapestDiesel = Math.min(...results.filter(r => r.diesel !== null).map(r => r.diesel), Infinity);
+  const cheapestSuper = Math.min(...results.filter(r => r.super !== null).map(r => r.super), Infinity);
+  const statusLabel = { not_found: 'nicht gefunden', no_price: 'kein Preis gemeldet', closed: 'geschlossen' };
+
+  list.innerHTML = sorted.map(r => {
+    const isBestDiesel = r.diesel === cheapestDiesel && r.diesel !== null;
+    const isBestSuper = r.super === cheapestSuper && r.super !== null;
+    const cardClasses = [];
+    if(isBestDiesel) cardClasses.push('best-diesel');
+    if(isBestSuper) cardClasses.push('best-super');
+
+    const dieselHtml = r.diesel !== null
+      ? `<div class="fv">${fmtPrice(r.diesel)}<span style="font-size:0.7rem;color:var(--ink-soft);"> €</span></div>`
+      : `<div class="fv na">${statusLabel[r.dieselStatus] || '–'}</div>`;
+    const superHtml = r.super !== null
+      ? `<div class="fv">${fmtPrice(r.super)}<span style="font-size:0.7rem;color:var(--ink-soft);"> €</span></div>`
+      : `<div class="fv na">${statusLabel[r.superStatus] || '–'}</div>`;
+
+    const todayHours = describeHoursToday(r.hoursRaw);
+    const fullHours = describeHoursFull(r.hoursRaw);
+    let hoursHtml;
+    if(todayHours){
+      hoursHtml = `Heute: ${todayHours}`;
+      if(fullHours && fullHours.length) hoursHtml += `<details><summary>Ganze Woche</summary><ul class="hours-list">${fullHours.map(l=>`<li>${l}</li>`).join('')}</ul></details>`;
+    } else if(fullHours && fullHours.length){
+      hoursHtml = `<details><summary>Öffnungszeiten</summary><ul class="hours-list">${fullHours.map(l=>`<li>${l}</li>`).join('')}</ul></details>`;
+    } else {
+      hoursHtml = `<span class="na">Öffnungszeiten unbekannt</span>`;
+    }
+
+    const badges = [
+      isBestDiesel ? '<span class="badge diesel">günstigster Diesel</span>' : '',
+      isBestSuper ? '<span class="badge super">günstigster Super95</span>' : '',
+      r.isOpen === false ? '<span class="badge" style="background:#F3E1DE;color:#8A2E1F;">geschlossen</span>' : ''
+    ].join('');
+
+    return `
+      <div class="station-card ${cardClasses.join(' ')}">
+        <div class="station-head">
+          <div>
+            <div class="station-name">${r.name}</div>
+            <div class="station-addr">${r.address}</div>
+          </div>
+          <div class="badge-col">${badges}</div>
+        </div>
+        <div class="price-row">
+          <div class="price-cell"><div class="fl"><span class="fuel-dot diesel"></span>Diesel</div>${dieselHtml}</div>
+          <div class="price-cell"><div class="fl"><span class="fuel-dot super"></span>Super 95</div>${superHtml}</div>
+        </div>
+        <div class="hours-row">${hoursHtml}</div>
+        ${mapsButton(r.point, r.name)}
+      </div>
+    `;
+  }).join('');
+}
+
+(async function init(){
+  const statusLine = document.getElementById('statusLine');
+  let currentSort = 'diesel';
+  try{
+    const results = await loadAll();
+    renderHero(results);
+    renderList(results, currentSort);
+
+    const notFound = results.filter(r => r.dieselStatus === 'not_found' && r.superStatus === 'not_found').length;
+    const noPrice = results.filter(r =>
+      (r.dieselStatus === 'no_price' || r.dieselStatus === 'closed') &&
+      (r.superStatus === 'no_price' || r.superStatus === 'closed')
+    ).length;
+    let note = '';
+    if(notFound) note += ` · ${notFound} Station${notFound===1?'':'en'} nicht in der Nähe gefunden`;
+    if(noPrice) note += ` · ${noPrice} Station${noPrice===1?'':'en'} ohne gemeldeten Preis`;
+    statusLine.textContent = 'Zuletzt aktualisiert: ' + new Date().toLocaleTimeString('de-AT', {hour:'2-digit', minute:'2-digit'}) + note;
+
+    document.getElementById('sortDiesel').addEventListener('click', () => {
+      currentSort = 'diesel';
+      document.getElementById('sortDiesel').classList.add('active');
+      document.getElementById('sortSuper').classList.remove('active');
+      renderList(results, currentSort);
+    });
+    document.getElementById('sortSuper').addEventListener('click', () => {
+      currentSort = 'super';
+      document.getElementById('sortSuper').classList.add('active');
+      document.getElementById('sortDiesel').classList.remove('active');
+      renderList(results, currentSort);
+    });
+  }catch(e){
+    statusLine.textContent = 'Fehler beim Laden der Preise: ' + (e.message || e);
+    statusLine.classList.add('error');
+  }
+})();
+</script>
+
+</body>
+</html>
