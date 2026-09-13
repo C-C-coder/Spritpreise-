@@ -270,7 +270,7 @@
   <img class="logo" src="logo.png" alt="Logo" onerror="this.style.display='none'">
   <div class="titles">
     <h1>Sprit-Check</h1>
-    <p>Diesel &amp; Super 95 – 9 fixe Stationen</p>
+    <p>Diesel &amp; Super 95 – 8 fixe Stationen</p>
   </div>
 </header>
 
@@ -360,7 +360,6 @@ function olcRecoverNearest(shortCode, refLat, refLon){
 
 /* ---------- Stationsliste ---------- */
 const STATIONS = [
-  { name: 'Hütteter GmbH', address: 'Hauptstraße 98, 2755 Öd' },
   { name: 'BP', address: 'Autobahnzubringer 21, 2752 Wöllersdorf' },
   { name: 'Shell', address: 'Wiener Neustädter Str 10, 2752 Wöllersdorf' },
   { name: 'Avanti', address: 'Puchbergerstraße 44, 2700 Wiener Neustadt' },
@@ -368,11 +367,10 @@ const STATIONS = [
   { name: 'Jet', address: 'Grazer Straße 83, 2604 Theresienfeld' },
   { name: 'OMV', address: 'Wiener Straße 126, 2700 Wiener Neustadt' },
   { name: 'Turmöl', address: 'Wiener Straße 114, 2700 Wiener Neustadt' },
-  { name: 'Diskonttankstelle (Hofer)', address: 'Parkplatz 68, 2604 Theresienfeld', plusCode: 'R6WV+HP', locality: 'Theresienfeld' }
+  { name: 'Diskonttankstelle (Hofer)', address: 'Parkplatz 68, 2604 Theresienfeld', plusCode: 'R6WV+HP', locality: '2604 Theresienfeld' }
 ];
 const PLUS_CODE_OVERRIDES = {
-  'Hütteter GmbH': { plusCode: 'V2HF+J2', locality: 'Öd, Niederösterreich' },
-  'BP': { plusCode: 'V55J+W8', locality: 'Wöllersdorf' }
+  'BP': { plusCode: 'V55J+W8', locality: '2752 Wöllersdorf' }
 };
 STATIONS.forEach(s => { if(PLUS_CODE_OVERRIDES[s.name]) Object.assign(s, PLUS_CODE_OVERRIDES[s.name]); });
 
@@ -428,8 +426,22 @@ function describeHoursFull(raw){
   });
 }
 
+function isOpenNowFromHours(raw){
+  const todayStr = describeHoursToday(raw);
+  if(!todayStr) return null;
+  if(todayStr === 'durchgehend geöffnet') return true;
+  const m = todayStr.match(/^(\d{2}):(\d{2})–(\d{2}):(\d{2})$/);
+  if(!m) return null;
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const openMin = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  let closeMin = parseInt(m[3], 10) * 60 + parseInt(m[4], 10);
+  if(closeMin <= openMin) closeMin += 24 * 60;
+  return nowMin >= openMin && nowMin < closeMin;
+}
+
 /* ---------- Ortung: Adresse oder Plus Code ---------- */
-async function geocodeAddress(query){
+async function geocodeRaw(query){
   const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=at&q=' + encodeURIComponent(query + ', Österreich');
   const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
   if(!res.ok) throw new Error('Geocoding fehlgeschlagen');
@@ -438,18 +450,42 @@ async function geocodeAddress(query){
   return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
 }
 
+function transliterateUmlauts(s){
+  return s.replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/Ä/g,'Ae').replace(/Ö/g,'Oe').replace(/Ü/g,'Ue').replace(/ß/g,'ss');
+}
+
+async function geocodeAddress(query){
+  const direct = await geocodeRaw(query);
+  if(direct) return direct;
+  const translit = transliterateUmlauts(query);
+  if(translit !== query){
+    const fallback = await geocodeRaw(translit);
+    if(fallback) return fallback;
+  }
+  return null;
+}
+
 async function resolvePoint(station){
   if(station.plusCode){
     const ref = await geocodeAddress(station.locality);
-    if(!ref) return null;
-    return olcRecoverNearest(station.plusCode, ref.lat, ref.lon);
+    if(!ref) return { point: null, reason: 'locality_not_found' };
+    return { point: olcRecoverNearest(station.plusCode, ref.lat, ref.lon), reason: null };
   }
-  return await geocodeAddress(station.address);
+  const point = await geocodeAddress(station.address);
+  return { point, reason: point ? null : 'address_not_found' };
 }
 
 const MATCH_RADIUS_KM = 1.0;
 
-async function findNearestStation(point, fuelCode){
+function normalizeName(s){
+  return (s || '')
+    .toLowerCase()
+    .replace(/[äöüß]/g, m => ({ä:'a',ö:'o',ü:'u',ß:'ss'}[m]))
+    .replace(/gmbh|gesmbh|kg|co\.?/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+async function findNearestStation(point, fuelCode, nameHint){
   const url = `https://api.e-control.at/sprit/1.0/search/gas-stations/by-address?latitude=${point.lat}&longitude=${point.lon}&fuelType=${fuelCode}&includeClosed=true`;
   const res = await fetch(url);
   if(!res.ok) throw new Error('E-Control API nicht erreichbar');
@@ -459,14 +495,34 @@ async function findNearestStation(point, fuelCode){
   const nearby = sorted.filter(s => typeof s.distance !== 'number' || s.distance <= MATCH_RADIUS_KM);
   if(!nearby.length) return { status: 'not_found', price: null, name: null, hours: null, open: null };
 
-  const nearest = nearby[0];
+  // Bevorzugt eine Station, deren Name zum erwarteten Markennamen passt (z.B. "OMV"),
+  // statt blind die geografisch nächste Erfassung zu nehmen — auf einem Areal mit
+  // mehreren Zapfpunkten (z.B. Tankstelle + CNG-Ladepunkt) kann sonst die falsche
+  // Erfassung "gewinnen", obwohl die gesuchte Marke ein Stück weiter, aber trotzdem
+  // im Suchradius liegt.
+  const hint = normalizeName(nameHint);
+  let nearest = nearby[0];
+  if(hint){
+    const nameMatch = nearby.find(s => {
+      const n = normalizeName(s.name);
+      return n && (n.includes(hint) || hint.includes(n));
+    });
+    if(nameMatch) nearest = nameMatch;
+  }
+
+  const candidates = nearby.slice(0, 6).map(s => ({
+    name: s.name,
+    distance: typeof s.distance === 'number' ? s.distance : null,
+    priced: !!(s.prices && s.prices.length && typeof s.prices[0].amount === 'number')
+  }));
+
   const hasPrice = nearest.prices && nearest.prices.length && typeof nearest.prices[0].amount === 'number';
   const hours = nearest.openingHours || nearest.location?.openingHours || nearest.businessHours || null;
   const open = typeof nearest.open === 'boolean' ? nearest.open : null;
 
-  if(hasPrice) return { status: 'ok', price: nearest.prices[0].amount, name: nearest.name, hours, open };
-  if(nearest.open === false) return { status: 'closed', price: null, name: nearest.name, hours, open };
-  return { status: 'no_price', price: null, name: nearest.name, hours, open };
+  if(hasPrice) return { status: 'ok', price: nearest.prices[0].amount, name: nearest.name, hours, open, candidates };
+  if(nearest.open === false) return { status: 'closed', price: null, name: nearest.name, hours, open, candidates };
+  return { status: 'no_price', price: null, name: nearest.name, hours, open, candidates };
 }
 
 async function loadAll(){
@@ -474,25 +530,33 @@ async function loadAll(){
   const results = STATIONS.map(s => ({
     ...s, diesel: null, super: null,
     dieselStatus: 'not_found', superStatus: 'not_found',
-    hoursRaw: null, point: null, isOpen: null
+    hoursRaw: null, point: null, isOpen: null,
+    dieselCandidates: [], superCandidates: [], locateFailed: null
   }));
 
   for(let i = 0; i < STATIONS.length; i++){
     statusLine.textContent = `Suche Station ${i+1} von ${STATIONS.length}: ${STATIONS[i].name} …`;
     try{
-      const point = await resolvePoint(STATIONS[i]);
-      if(!point) continue;
+      const { point, reason } = await resolvePoint(STATIONS[i]);
+      if(!point){
+        results[i].locateFailed = reason;
+        continue;
+      }
       results[i].point = point;
-      const die = await findNearestStation(point, 'DIE');
+      const die = await findNearestStation(point, 'DIE', STATIONS[i].name);
       results[i].diesel = die.price;
       results[i].dieselStatus = die.status;
+      results[i].dieselCandidates = die.candidates || [];
       await sleep(300);
-      const sup = await findNearestStation(point, 'SUP');
+      const sup = await findNearestStation(point, 'SUP', STATIONS[i].name);
       results[i].super = sup.price;
       results[i].superStatus = sup.status;
+      results[i].superCandidates = sup.candidates || [];
       results[i].hoursRaw = die.hours || sup.hours || null;
-      results[i].isOpen = (die.open === false || sup.open === false) ? false
+      const flagOpen = (die.open === false || sup.open === false) ? false
         : (die.open === true || sup.open === true) ? true : null;
+      const scheduleOpen = isOpenNowFromHours(results[i].hoursRaw);
+      results[i].isOpen = scheduleOpen !== null ? scheduleOpen : flagOpen;
       await sleep(700);
     }catch(e){ /* einzelne Station darf fehlschlagen */ }
   }
@@ -527,7 +591,7 @@ function renderHero(results){
       <div class="hero-label"><span class="fuel-dot ${fuel.key}"></span>${fuel.label} – günstigste</div>
       <div class="hero-price">${fmtPrice(cheapest[fuel.key])}<span class="cur">€</span></div>
       <div class="hero-station">${cheapest.name}</div>
-      <div class="hero-avg"><span>Ø der 9</span><strong>${fmtPrice(avg)} €</strong></div>
+      <div class="hero-avg"><span>Ø der 8</span><strong>${fmtPrice(avg)} €</strong></div>
     `;
     grid.appendChild(card);
   });
@@ -583,6 +647,27 @@ function renderList(results, sortKey){
       r.isOpen === false ? '<span class="badge" style="background:#F3E1DE;color:#8A2E1F;">geschlossen</span>' : ''
     ].join('');
 
+    function candidateList(cands){
+      if(!cands || !cands.length) return '<li>Keine Tankstelle im Umkreis gefunden</li>';
+      return cands.map(c =>
+        `<li>${c.name}${c.distance !== null ? ` · ${c.distance.toFixed(2)} km` : ''} — ${c.priced ? 'hat Preis' : 'kein Preis in dieser Antwort'}</li>`
+      ).join('');
+    }
+    const needsDiagnosis = r.diesel === null || r.super === null;
+    const locateReasonLabel = { locality_not_found: 'Ortsname konnte nicht gefunden werden (auch nicht mit Umlaut-Alternative)', address_not_found: 'Adresse konnte nicht gefunden werden' };
+    const diagnosisHtml = needsDiagnosis ? `
+      <details style="margin-top:8px;">
+        <summary>Diagnose: was die API an diesem Punkt liefert</summary>
+        <div style="font-size:0.74rem; color:var(--ink-soft); margin-top:4px;">
+          ${r.locateFailed ? `<strong>Ortung fehlgeschlagen:</strong> ${locateReasonLabel[r.locateFailed] || r.locateFailed}` : `
+          <strong>Diesel-Abfrage:</strong>
+          <ul class="hours-list">${candidateList(r.dieselCandidates)}</ul>
+          <strong>Super95-Abfrage:</strong>
+          <ul class="hours-list">${candidateList(r.superCandidates)}</ul>
+          `}
+        </div>
+      </details>` : '';
+
     return `
       <div class="station-card ${cardClasses.join(' ')}">
         <div class="station-head">
@@ -598,6 +683,7 @@ function renderList(results, sortKey){
         </div>
         <div class="hours-row">${hoursHtml}</div>
         ${mapsButton(r.point, r.name)}
+        ${diagnosisHtml}
       </div>
     `;
   }).join('');

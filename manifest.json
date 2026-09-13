@@ -1,7 +1,7 @@
 {
   "name": "Sprit-Check",
   "short_name": "Sprit-Check",
-  "description": "Diesel- und Super95-Preise für 9 fixe Tankstellen",
+  "description": "Diesel- und Super95-Preise für 8 fixe Tankstellen",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#E8ECEA",
